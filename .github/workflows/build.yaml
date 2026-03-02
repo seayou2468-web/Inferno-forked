@@ -5,6 +5,7 @@ on:
 jobs:
   build_linux:
     runs-on: ubuntu-24.04
+
     steps:
       - uses: actions/checkout@v6
         with:
@@ -15,7 +16,12 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get upgrade -y
-          sudo apt-get install -y build-essential libtool meson ninja-build pkg-config libcapstone-dev device-tree-compiler libglib2.0-dev gnutls-bin libjpeg-turbo8-dev libpng-dev libslirp-dev libssh-dev libusb-1.0-0-dev liblzo2-dev libncurses5-dev libpixman-1-dev libsnappy-dev vde2 zstd libgnutls28-dev libgmp10 libgmp3-dev lzfse liblzfse-dev
+          sudo apt-get install -y build-essential libtool meson ninja-build pkg-config \
+            libcapstone-dev device-tree-compiler libglib2.0-dev gnutls-bin \
+            libjpeg-turbo8-dev libpng-dev libslirp-dev libssh-dev \
+            libusb-1.0-0-dev liblzo2-dev libncurses5-dev libpixman-1-dev \
+            libsnappy-dev vde2 zstd libgnutls28-dev libgmp10 libgmp3-dev \
+            lzfse liblzfse-dev
 
       - name: Build nettle 3.10.2
         run: |
@@ -31,11 +37,27 @@ jobs:
         run: |
           mkdir build
           cd build
-          PKG_CONFIG_PATH=/usr/local/lib64/pkgconfig ../configure --target-list=aarch64-softmmu,x86_64-softmmu --disable-linux-user --disable-guest-agent --enable-capstone --enable-slirp --enable-lzfse --enable-nettle --enable-gnutls --disable-werror --disable-tests --disable-qom-cast-debug --disable-plugins
+          PKG_CONFIG_PATH=/usr/local/lib64/pkgconfig ../configure \
+            --target-list=aarch64-softmmu,x86_64-softmmu \
+            --disable-linux-user \
+            --disable-guest-agent \
+            --enable-capstone \
+            --enable-slirp \
+            --enable-lzfse \
+            --enable-nettle \
+            --enable-gnutls \
+            --disable-werror \
+            --disable-tests \
+            --disable-qom-cast-debug \
+            --disable-plugins
           make -j$(nproc)
+
+      - name: Create tar.gz archive
+        run: |
+          tar -czvf linux-build.tar.gz build
 
       - name: Upload Linux build artifacts
         uses: actions/upload-artifact@v4
         with:
           name: linux-build
-          path: build  # build ディレクトリを丸ごとアップロード
+          path: linux-build.tar.gz

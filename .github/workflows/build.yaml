@@ -1,4 +1,5 @@
 name: build
+
 on:
   workflow_dispatch:
 
@@ -6,38 +7,63 @@ jobs:
   build_linux:
     runs-on: ubuntu-24.04
 
+    env:
+      PREFIX: /opt/qemu
+      PKG_CONFIG_PATH: /usr/local/lib/pkgconfig:/usr/local/lib64/pkgconfig
+
     steps:
-      - uses: actions/checkout@v6
+      - name: Checkout source
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          submodules: true
+          submodules: recursive
 
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get upgrade -y
-          sudo apt-get install -y build-essential libtool meson ninja-build pkg-config \
-            libcapstone-dev device-tree-compiler libglib2.0-dev gnutls-bin \
-            libjpeg-turbo8-dev libpng-dev libslirp-dev libssh-dev \
-            libusb-1.0-0-dev liblzo2-dev libncurses5-dev libpixman-1-dev \
-            libsnappy-dev vde2 zstd libgnutls28-dev libgmp10 libgmp3-dev \
-            lzfse liblzfse-dev
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+            build-essential \
+            libtool \
+            meson \
+            ninja-build \
+            pkg-config \
+            libcapstone-dev \
+            device-tree-compiler \
+            libglib2.0-dev \
+            gnutls-bin \
+            libjpeg-turbo8-dev \
+            libpng-dev \
+            libslirp-dev \
+            libssh-dev \
+            libusb-1.0-0-dev \
+            liblzo2-dev \
+            libncurses5-dev \
+            libpixman-1-dev \
+            libsnappy-dev \
+            vde2 \
+            zstd \
+            libgnutls28-dev \
+            libgmp-dev \
+            lzfse \
+            liblzfse-dev
 
       - name: Build nettle 3.10.2
         run: |
-          wget https://ftpmirror.gnu.org/gnu/nettle/nettle-3.10.2.tar.gz
-          echo "fe9ff51cb1f2abb5e65a6b8c10a92da0ab5ab6eaf26e7fc2b675c45f1fb519b5  nettle-3.10.2.tar.gz" | sha256sum -c - || exit 1
-          tar -xvf nettle-3.10.2.tar.gz
+          wget -q https://ftpmirror.gnu.org/gnu/nettle/nettle-3.10.2.tar.gz
+          echo "fe9ff51cb1f2abb5e65a6b8c10a92da0ab5ab6eaf26e7fc2b675c45f1fb519b5  nettle-3.10.2.tar.gz" | sha256sum -c -
+          tar -xf nettle-3.10.2.tar.gz
           cd nettle-3.10.2
-          ./configure
+          ./configure --prefix=/usr/local --disable-openssl
           make -j$(nproc)
           sudo make install
+          sudo ldconfig
 
-      - name: Build
+      - name: Configure
         run: |
           mkdir build
           cd build
-          PKG_CONFIG_PATH=/usr/local/lib64/pkgconfig ../configure \
+          ../configure \
+            --prefix=${PREFIX} \
             --target-list=aarch64-softmmu,x86_64-softmmu \
             --disable-linux-user \
             --disable-guest-agent \
@@ -49,15 +75,34 @@ jobs:
             --disable-werror \
             --disable-tests \
             --disable-qom-cast-debug \
-            --disable-plugins
+            --disable-plugins \
+            --extra-ldflags="-Wl,-rpath,\$ORIGIN/../lib"
+
+      - name: Build
+        run: |
+          cd build
           make -j$(nproc)
 
-      - name: Create tar.gz archive
+      - name: Install into staging directory
         run: |
-          tar -czvf linux-build.tar.gz build
+          cd build
+          make install DESTDIR=$(pwd)/package
 
-      - name: Upload Linux build artifacts
+      - name: Strip binaries (safe)
+        run: |
+          find build/package -type f -executable -exec sh -c 'file -b "$1" | grep -q ELF && strip --strip-unneeded "$1" || true' _ {} \;
+
+      - name: Verify linkage
+        run: |
+          ldd build/package${PREFIX}/bin/qemu-system-x86_64 || true
+
+      - name: Create tar.gz package
+        run: |
+          cd build/package
+          tar --owner=0 --group=0 -czf linux-qemu-ubuntu24-stable.tar.gz .
+
+      - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: linux-build
-          path: linux-build.tar.gz
+          name: linux-qemu-ubuntu24-stable
+          path: build/package/linux-qemu-ubuntu24-stable.tar.gz

@@ -53,8 +53,9 @@ jobs:
 
       - name: Package artifacts
         run: |
+          set -e
           mkdir dist
-          cp build/qemu-system-* dist/
+          find build -maxdepth 1 -type f -executable -name "qemu-system-*" -exec strip {} \; -exec cp {} dist/ \;
           cd dist
           tar -czf qemu-linux-x86_64-aarch64.tar.gz *
 

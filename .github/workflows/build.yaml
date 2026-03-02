@@ -45,7 +45,8 @@ jobs:
             libgnutls28-dev \
             libgmp-dev \
             lzfse \
-            liblzfse-dev
+            liblzfse-dev \
+            rsync
 
       - name: Build nettle 3.10.2
         run: |
@@ -100,7 +101,7 @@ jobs:
         run: |
           # 一時ディレクトリにコピーして安全に圧縮
           mkdir -p /tmp/package
-          cp -r build/package/* /tmp/package/
+          rsync -a --delete build/package/ /tmp/package/
           cd /tmp/package
           tar --owner=0 --group=0 -czf linux-qemu-ubuntu24-stable.tar.gz .
           mv linux-qemu-ubuntu24-stable.tar.gz ../../build/package/

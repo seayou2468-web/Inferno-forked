@@ -13,20 +13,23 @@ jobs:
         with:
           fetch-depth: 0
           submodules: true
+
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get upgrade
+          sudo apt-get upgrade -y
           sudo apt-get install -y build-essential libtool meson ninja-build pkg-config libcapstone-dev device-tree-compiler libglib2.0-dev gnutls-bin libjpeg-turbo8-dev libpng-dev libslirp-dev libssh-dev libusb-1.0-0-dev liblzo2-dev libncurses5-dev libpixman-1-dev libsnappy-dev vde2 zstd libgnutls28-dev libgmp10 libgmp3-dev lzfse liblzfse-dev
+
       - name: Build nettle 3.10.2
         run: |
           wget https://ftpmirror.gnu.org/gnu/nettle/nettle-3.10.2.tar.gz
-          echo "fe9ff51cb1f2abb5e65a6b8c10a92da0ab5ab6eaf26e7fc2b675c45f1fb519b5 nettle-3.10.2.tar.gz" | sha256sum -c - || exit 1
+          echo "fe9ff51cb1f2abb5e65a6b8c10a92da0ab5ab6eaf26e7fc2b675c45f1fb519b5  nettle-3.10.2.tar.gz" | sha256sum -c - || exit 1
           tar -xvf nettle-3.10.2.tar.gz
           cd nettle-3.10.2
           ./configure
           make -j$(nproc)
           sudo make install
+
       - name: Build
         run: |
           mkdir build
@@ -34,34 +37,8 @@ jobs:
           PKG_CONFIG_PATH=/usr/local/lib64/pkgconfig ../configure --target-list=aarch64-softmmu,x86_64-softmmu --disable-linux-user --disable-guest-agent --enable-capstone --enable-slirp --enable-lzfse --enable-nettle --enable-gnutls --disable-werror --disable-tests --disable-qom-cast-debug --disable-plugins
           make -j$(nproc)
 
-  build_macos:
-    runs-on: macos-15
-    steps:
-      - uses: actions/checkout@v6
+      - name: Upload Linux build artifacts
+        uses: actions/upload-artifact@v4
         with:
-          fetch-depth: 0
-          submodules: true
-      - name: Install dependencies
-        run: |
-          brew install libtool meson ninja pkgconf capstone dtc glib gnutls jpeg-turbo libpng libslirp libssh libusb lzo ncurses nettle pixman snappy vde zstd lzfse nettle
-      - name: Build
-        run: |
-          mkdir build && cd build
-          LIBTOOL="glibtool" ../configure --target-list=aarch64-softmmu,x86_64-softmmu --disable-bsd-user --disable-guest-agent --enable-lzfse --enable-slirp --enable-capstone --enable-curses --enable-libssh --enable-virtfs --enable-zstd --extra-cflags=-DNCURSES_WIDECHAR=1 --disable-sdl --disable-gtk --enable-cocoa --enable-lzfse --enable-nettle --enable-gnutls --disable-werror --extra-cflags="-I/opt/homebrew/include" --extra-ldflags="-L/opt/homebrew/lib" --disable-tests --disable-qom-cast-debug --disable-plugins
-          make -j$(sysctl -n hw.logicalcpu)
-
-  build_macos_x86_64:
-    runs-on: macos-15-intel
-    steps:
-      - uses: actions/checkout@v6
-        with:
-          fetch-depth: 0
-          submodules: true
-      - name: Install dependencies
-        run: |
-          brew install libtool meson ninja pkgconf capstone dtc glib gnutls jpeg-turbo libpng libslirp libssh libusb lzo ncurses nettle pixman snappy vde zstd lzfse nettle
-      - name: Build
-        run: |
-          mkdir build && cd build
-          LIBTOOL="glibtool" ../configure --target-list=aarch64-softmmu,x86_64-softmmu --disable-bsd-user --disable-guest-agent --enable-lzfse --enable-slirp --enable-capstone --enable-curses --enable-libssh --enable-virtfs --enable-zstd --extra-cflags=-DNCURSES_WIDECHAR=1 --disable-sdl --disable-gtk --enable-cocoa --enable-lzfse --enable-nettle --enable-gnutls --disable-werror --extra-cflags="-I/opt/homebrew/include" --extra-ldflags="-L/opt/homebrew/lib" --disable-tests --disable-qom-cast-debug --disable-plugins
-          make -j$(sysctl -n hw.logicalcpu)
+          name: linux-build
+          path: build  # build ディレクトリを丸ごとアップロード

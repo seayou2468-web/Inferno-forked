@@ -58,7 +58,7 @@ jobs:
           sudo make install
           sudo ldconfig
 
-      - name: Configure
+      - name: Configure QEMU
         run: |
           mkdir build
           cd build
@@ -78,7 +78,7 @@ jobs:
             --disable-plugins \
             --extra-ldflags="-Wl,-rpath,\$ORIGIN/../lib"
 
-      - name: Build
+      - name: Build QEMU
         run: |
           cd build
           make -j$(nproc)
@@ -96,10 +96,14 @@ jobs:
         run: |
           ldd build/package${PREFIX}/bin/qemu-system-x86_64 || true
 
-      - name: Create tar.gz package
+      - name: Create tar.gz package safely
         run: |
-          cd build/package
+          # 一時ディレクトリにコピーして安全に圧縮
+          mkdir -p /tmp/package
+          cp -r build/package/* /tmp/package/
+          cd /tmp/package
           tar --owner=0 --group=0 -czf linux-qemu-ubuntu24-stable.tar.gz .
+          mv linux-qemu-ubuntu24-stable.tar.gz ../../build/package/
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
